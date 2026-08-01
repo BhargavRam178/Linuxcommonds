@@ -1,0 +1,20 @@
+Command	   Purpose
+ls	   List files and directories
+ls -a	   Show hidden files
+cd	   Change directory
+pwd	   Show current directory
+mkdir	   Create a directory
+rmdir	   Remove an empty directory
+rm	   Delete files
+rm -rf	   Delete directories recursively (use carefully)
+cp	   Copy files
+mv	   Move or rename files
+touch	   Create an empty file
+cat	   Display file contents
+head	   Show first 10 lines
+tail	   Show last 10 lines
+less	   View large files page by page
+touch      empty file
+vi         open files
+ls -lrt    latest files shows
+
