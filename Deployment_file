@@ -1,0 +1,209 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: v5-api-app-pulse
+  namespace: dev-vtx-api
+  uid: ca0f52d8-5c29-442b-ad15-34dc3f196b31
+  resourceVersion: '89918591'
+  generation: 25
+  creationTimestamp: '2026-04-02T20:43:36Z'
+  annotations:
+    azure-pipelines/jobName: '"Deploy to Kubernetes"'
+    azure-pipelines/org: https://dev.azure.com/everestdx/
+    azure-pipelines/pipeline: '"Dev-V5-API-AppPulse"'
+    azure-pipelines/pipelineId: '"270"'
+    azure-pipelines/project: EDXi_Platform_Roadmap
+    azure-pipelines/run: '20260803.1'
+    azure-pipelines/runuri: >-
+      https://dev.azure.com/everestdx/EDXi_Platform_Roadmap/_build/results?buildId=35200
+    deployment.kubernetes.io/revision: '18'
+    kubectl.kubernetes.io/last-applied-configuration: >
+      {"apiVersion":"apps/v1","kind":"Deployment","metadata":{"annotations":{},"name":"v5-api-app-pulse","namespace":"dev-vtx-api"},"spec":{"replicas":1,"selector":{"matchLabels":{"app":"v5-api-app-pulse"}},"template":{"metadata":{"labels":{"app":"v5-api-app-pulse","business":"dps","cost_center":"dps","sub_business":"insightone"}},"spec":{"containers":[{"image":"vantagexdev.azurecr.io/v5-api-app-pulse:35200","name":"v5-api-app-pulse","ports":[{"containerPort":8000,"protocol":"TCP"}]}],"imagePullSecrets":[{"name":"dev-vtx-acr"}],"schedulerName":"default-scheduler"}}}}
+  managedFields:
+    - manager: Mozilla
+      operation: Update
+      apiVersion: apps/v1
+      time: '2026-04-04T04:13:00Z'
+      fieldsType: FieldsV1
+      fieldsV1:
+        f:spec:
+          f:progressDeadlineSeconds: {}
+          f:replicas: {}
+          f:revisionHistoryLimit: {}
+          f:selector: {}
+          f:strategy:
+            f:rollingUpdate:
+              .: {}
+              f:maxSurge: {}
+              f:maxUnavailable: {}
+            f:type: {}
+          f:template:
+            f:metadata:
+              f:labels:
+                .: {}
+                f:app: {}
+                f:business: {}
+                f:cost_center: {}
+                f:sub_business: {}
+            f:spec:
+              f:containers:
+                k:{"name":"v5-api-app-pulse"}:
+                  .: {}
+                  f:imagePullPolicy: {}
+                  f:name: {}
+                  f:ports:
+                    .: {}
+                    k:{"containerPort":8000,"protocol":"TCP"}:
+                      .: {}
+                      f:containerPort: {}
+                      f:protocol: {}
+                  f:resources: {}
+                  f:terminationMessagePath: {}
+                  f:terminationMessagePolicy: {}
+              f:dnsPolicy: {}
+              f:imagePullSecrets:
+                .: {}
+                k:{"name":"dev-vtx-acr"}: {}
+              f:restartPolicy: {}
+              f:schedulerName: {}
+              f:securityContext: {}
+              f:terminationGracePeriodSeconds: {}
+    - manager: node-fetch
+      operation: Update
+      apiVersion: apps/v1
+      time: '2026-05-04T23:48:24Z'
+      fieldsType: FieldsV1
+      fieldsV1:
+        f:spec:
+          f:template:
+            f:spec:
+              f:tolerations: {}
+    - manager: kubectl-client-side-apply
+      operation: Update
+      apiVersion: apps/v1
+      time: '2026-08-03T13:48:26Z'
+      fieldsType: FieldsV1
+      fieldsV1:
+        f:metadata:
+          f:annotations:
+            f:kubectl.kubernetes.io/last-applied-configuration: {}
+        f:spec:
+          f:template:
+            f:spec:
+              f:containers:
+                k:{"name":"v5-api-app-pulse"}:
+                  f:image: {}
+    - manager: kubectl-annotate
+      operation: Update
+      apiVersion: apps/v1
+      time: '2026-08-03T13:48:40Z'
+      fieldsType: FieldsV1
+      fieldsV1:
+        f:metadata:
+          f:annotations:
+            f:azure-pipelines/jobName: {}
+            f:azure-pipelines/org: {}
+            f:azure-pipelines/pipeline: {}
+            f:azure-pipelines/pipelineId: {}
+            f:azure-pipelines/project: {}
+            f:azure-pipelines/run: {}
+            f:azure-pipelines/runuri: {}
+    - manager: kube-controller-manager
+      operation: Update
+      apiVersion: apps/v1
+      time: '2026-09-06T02:42:33Z'
+      fieldsType: FieldsV1
+      fieldsV1:
+        f:metadata:
+          f:annotations:
+            .: {}
+            f:deployment.kubernetes.io/revision: {}
+        f:status:
+          f:availableReplicas: {}
+          f:conditions:
+            .: {}
+            k:{"type":"Available"}:
+              .: {}
+              f:lastTransitionTime: {}
+              f:lastUpdateTime: {}
+              f:message: {}
+              f:reason: {}
+              f:status: {}
+              f:type: {}
+            k:{"type":"Progressing"}:
+              .: {}
+              f:lastTransitionTime: {}
+              f:lastUpdateTime: {}
+              f:message: {}
+              f:reason: {}
+              f:status: {}
+              f:type: {}
+          f:observedGeneration: {}
+          f:readyReplicas: {}
+          f:replicas: {}
+          f:terminatingReplicas: {}
+          f:updatedReplicas: {}
+      subresource: status
+  selfLink: /apis/apps/v1/namespaces/dev-vtx-api/deployments/v5-api-app-pulse
+status:
+  observedGeneration: 25
+  replicas: 1
+  updatedReplicas: 1
+  readyReplicas: 1
+  availableReplicas: 1
+  terminatingReplicas: 0
+  conditions:
+    - type: Progressing
+      status: 'True'
+      lastUpdateTime: '2026-08-03T13:48:39Z'
+      lastTransitionTime: '2026-04-02T20:43:36Z'
+      reason: NewReplicaSetAvailable
+      message: ReplicaSet "v5-api-app-pulse-5f64977978" has successfully progressed.
+    - type: Available
+      status: 'True'
+      lastUpdateTime: '2026-09-06T02:42:33Z'
+      lastTransitionTime: '2026-09-06T02:42:33Z'
+      reason: MinimumReplicasAvailable
+      message: Deployment has minimum availability.
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: v5-api-app-pulse
+  template:
+    metadata:
+      labels:
+        app: v5-api-app-pulse
+        business: dps
+        cost_center: dps
+        sub_business: insightone
+    spec:
+      containers:
+        - name: v5-api-app-pulse
+          image: vantagexdev.azurecr.io/v5-api-app-pulse:35200
+          ports:
+            - containerPort: 8000
+              protocol: TCP
+          resources: {}
+          terminationMessagePath: /dev/termination-log
+          terminationMessagePolicy: File
+          imagePullPolicy: IfNotPresent
+      restartPolicy: Always
+      terminationGracePeriodSeconds: 30
+      dnsPolicy: ClusterFirst
+      securityContext: {}
+      imagePullSecrets:
+        - name: dev-vtx-acr
+      schedulerName: default-scheduler
+      tolerations:
+        - key: dedicated
+          operator: Equal
+          value: web-api
+          effect: NoSchedule
+  strategy:
+    type: RollingUpdate
+    rollingUpdate:
+      maxUnavailable: 25%
+      maxSurge: 25%
+  revisionHistoryLimit: 10
+  progressDeadlineSeconds: 600
