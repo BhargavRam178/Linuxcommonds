@@ -1,0 +1,191 @@
+# Pipeline for API Deployment
+trigger:
+  - none
+
+pool: Internal-Agent
+
+parameters:
+  - name: DeploymentType
+    displayName: Deployment Type
+    type: string
+    default: Kubernetes
+    values:
+      - Kubernetes
+      - VirtualMachine
+      - ScanOnly
+      - kubernetesandArtifact
+  - name: SonarScan
+    displayName: Run Sonar Scan
+    type: string
+    default: True
+    values:
+        - True
+        - False
+  - name: SnykScan
+    displayName: Run Snyk Scan
+    type: string
+    default: True
+    values:
+        - True
+        - False
+  - name: TrivyImageScan
+    displayName: Trivy Image Scan
+    type: string
+    default: True
+    values:
+        - True
+        - False
+
+variables:
+  dockerRegistryServiceConnection: '$(dockerRegistry)'
+  imageRepository: '$(image_name)'
+  containerRegistry: '$(registryname).azurecr.io'
+  dockerfilePath: '$(Build.SourcesDirectory)/dockerfile'
+  tag: '$(Build.BuildId)'
+
+resources:
+  repositories:
+    - repository: envRepo
+      type: bitbucket
+      name: edxi/Internal-envs
+      endpoint: 'Bitbucket - dgmk'
+      ref: $(envbranch)
+
+stages:
+  - stage: Build
+    displayName: Build stage
+    jobs:
+      - job: Build
+        displayName: Build job
+        pool: Internal-Agent
+        steps:
+            
+          - checkout: envRepo
+            path: envs  
+          - checkout: self
+            path: s
+            
+          - task: Bash@3
+            inputs:
+              targetType: 'inline'
+              script: |
+                cp "$(Pipeline.Workspace)/envs/$(ENV_FILE_NAME)" \
+                   "$(Build.SourcesDirectory)/.env"               
+                   
+          - ${{ if eq(parameters.SonarScan, 'True') }}:
+            - task: SonarQubePrepare@7
+              inputs:
+                SonarQube: "SonarQube_internal"
+                scannerMode: "CLI"
+                configMode: "manual"
+                cliProjectKey: "$(projectkey)"
+                extraProperties: "sonar.branch.name=$(Build.SourceBranchName)"
+                cliSources: .
+
+            - task: SonarQubeAnalyze@7
+
+            - task: SonarQubePublish@7
+              inputs:
+                pollingTimeoutSec: "300"
+
+            - script: |
+                analysysinfo=$(curl -s -u $(token): "http://10.64.4.17/api/qualitygates/project_status?projectKey=$(projectkey)&branch=$(Build.SourceBranchName)" | jq '.projectStatus.conditions')
+                echo $analysysinfo
+                analysysstatus=$(curl -s -u $(token): "http://10.64.4.17/api/qualitygates/project_status?projectKey=$(projectkey)&branch=$(Build.SourceBranchName)" | jq '.projectStatus.status')
+                echo "Sonarqube status $analysysstatus"
+                if [ "$analysysstatus" == \""ERROR\"" ]
+                then
+                  exit 1
+                fi
+
+          - ${{ if eq(parameters.SnykScan, 'True') }}:
+            - script: |
+                snyk auth $(snyktoken)
+                python3 -m venv snykscan
+                source snykscan/bin/activate
+                pip install -r requirement.txt
+                snyk test --file=requirements.txt --command=python -- --allow-missing
+                snyk test --file=requirements.txt --command=python --severity-threshold=high -- --allow-missing
+                deactivate
+                rm -rf snykscan
+              displayName: "Snyk Scan"
+
+          - ${{ if or(eq(parameters.DeploymentType, 'Kubernetes'), eq(parameters.DeploymentType, 'kubernetesandArtifact')) }}:
+            - task: Docker@2
+              displayName: Build Docker Image
+              inputs:
+                command: build
+                repository: $(imageRepository)
+                dockerfile: $(dockerfilePath)
+                containerRegistry: $(dockerRegistryServiceConnection)
+                arguments: --ssh default=/home/edxiuser/.ssh/id_rsa
+                tags: |
+                  $(tag)
+            - ${{ if eq(parameters.TrivyImageScan, 'True') }}:
+              - script: |
+                  echo "Scanning image: $(containerRegistry)/$(imageRepository):$(tag)"
+                  /usr/local/bin/trivy image --severity HIGH,CRITICAL --exit-code 1 --ignore-unfixed $(containerRegistry)/$(imageRepository):$(tag)
+                displayName: "Trivy Image Scan"
+
+  - ${{ if or(eq(parameters.DeploymentType, 'Kubernetes'), eq(parameters.DeploymentType, 'kubernetesandArtifact')) }}:
+    - stage: Upload
+      displayName: Upload Stage
+      jobs:
+        - job: Upload
+          pool: Internal-Agent
+          steps:
+            - checkout: none
+            - task: Docker@2
+              inputs:
+                containerRegistry: $(dockerRegistryServiceConnection)
+                repository: $(imageRepository)
+                command: push
+                tags: |
+                  $(tag)
+
+
+  - ${{ if or(eq(parameters.DeploymentType, 'Kubernetes'), eq(parameters.DeploymentType, 'kubernetesandArtifact')) }}:
+    - stage: Deployment
+      displayName: Deployment Stage
+      dependsOn: Upload
+      jobs:
+        - job: Deploy
+          displayName: Deploy to Kubernetes
+          pool: Internal-Agent
+          steps:
+            - checkout: none
+            - task: KubernetesManifest@0
+              displayName: Deploy
+              inputs:
+                kubernetesServiceConnection: $(kubernetes-cluster-sc)
+                namespace: $(namespace)
+                manifests: $(manifestfilename)
+                containers: $(containerRegistry)/$(imageRepository):$(tag)
+
+  - ${{ if eq(parameters.DeploymentType, 'kubernetesandArtifact') }}:
+    - stage: Artifact_Upload
+      displayName: Upload to Container
+      dependsOn: Deployment
+      jobs:
+        - job: UploadtoBlob
+          displayName: Upload Artifact to Container
+          pool: Internal-Agent
+          steps:
+            - checkout: none
+            - task: Bash@3
+              inputs:
+                targetType: 'inline'
+                script: |
+                  date=$(date +%Y_%m_%d_%H_%M_%S)
+                  if [ -z "$(version)" ]; then
+                      echo "Version: $(version)"
+                      filename=APP_PULSE_API_Code_$(Build.SourceBranchName)_$date.tar.gz
+                  else
+                      filename=APP_PULSE_API_Code_$(Build.SourceBranchName)_v$(version)_$date.tar.gz
+                  fi
+                  echo "Filename: $filename"
+                  tar --exclude='.git' --exclude='.scannerwork' --exclude='sonar-project.properties' --exclude='.env' --exclude='APP_PULSE_API_Code_$(Build.SourceBranchName)_*.tar.gz' -cvzf $filename .
+                  az login --service-principal -u $(appid) -p $(secret) -t $(tenantid)
+                  az storage blob upload --account-name $(storagename) --container-name $(container) --name "$filename" --file "$filename" --auth-mode login
+                  end=$(date -u -d "30 minutes" '+%Y-%m-%dT%H:%MZ')
+                  az storage blob generate-sas --account-name $(storagename) --container-name $(container) --name "$filename" --permissions acdrw --expiry "$end" --auth-mode login --as-user --full-uri
