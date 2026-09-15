@@ -1,0 +1,166 @@
+# Pipeline for App Pulse API
+trigger: none
+parameters:
+  - name: DeploymentType
+    displayName: Deployment Type
+    type: string
+    default: ScanOnly
+    values:
+      - Kubernetes
+      - VirtualMachine
+      - ScanOnly
+      - PepsiCo
+  - name: SonarScan
+    displayName: Run Sonar Scan
+    type: boolean
+    default: true
+    values:
+     - True
+     - False
+  - name: SnykScan
+    displayName: Run Snyk Scan
+    type: boolean
+    default: true
+    values:
+     - True
+     - False
+  - name: TrivyImageScan
+    displayName: Trivy Image Scan
+    type: boolean
+    default: true
+    values:
+     - True
+     - False
+
+pool: Customer-Projects
+
+resources:
+  repositories:
+    - repository: envRepo
+      type: bitbucket
+      name: edxi/PepOps-envs
+      endpoint: 'Bitbucket - dgmk'
+      ref: $(envbranch)
+
+variables:
+  # Container registry service connection established during pipeline creation
+  dockerRegistryServiceConnection: '$(registryname)'
+  imageRepository: "$(image_name)"
+  containerRegistry: '$(registryname).azurecr.io'
+  dockerfilePath: "$(Build.SourcesDirectory)/dockerfile"
+  tag: "$(Build.BuildId)"
+
+stages:
+  - stage: Scan
+    displayName: Security Scans
+    jobs:
+      - job: Scan
+        displayName: Security Scans
+        pool: Customer-Projects
+        steps:
+          - ${{ if eq(parameters.SonarScan, true) }}:
+              - task: SonarQubePrepare@7
+                inputs:
+                  SonarQube: "SonarQube_internal"
+                  scannerMode: "CLI"
+                  configMode: "manual"
+                  cliProjectKey: "$(projectkey)"
+                  extraProperties: "sonar.branch.name=$(Build.SourceBranchName)"
+                  cliSources: .
+              - task: SonarQubeAnalyze@7
+              - task: SonarQubePublish@7
+                inputs:
+                  pollingTimeoutSec: "300"
+              - script: |
+                  analysysinfo=$(curl -s -u $(token): "http://10.64.4.17/api/qualitygates/project_status?projectKey=$(projectkey)&branch=$(Build.SourceBranchName)" | jq '.projectStatus.conditions')
+                  echo $analysysinfo
+                  analysysstatus=$(curl -s -u $(token): "http://10.64.4.17/api/qualitygates/project_status?projectKey=$(projectkey)&branch=$(Build.SourceBranchName)" | jq '.projectStatus.status')
+                  echo "Sonarqube status $analysysstatus"
+                  if [ "$analysysstatus" == \""ERROR\"" ]
+                  then
+                    exit 1
+                  fi
+          - ${{ if eq(parameters.SnykScan, true) }}:
+              - script: |
+                  snyk auth $(snyktoken)
+                  cd $(Build.Repository.LocalPath)
+                  python3 -m venv snyk_scan
+                  source snyk_scan/bin/activate
+                  python3 -m pip install -r requirement.txt
+                  snyk test --file=requirements.txt --command=python3 -- --allow-missing
+                  snyk test --file=requirements.txt --command=python3 --severity-threshold=high -- --allow-missing
+                  deactivate
+                  rm -rf snyk_scan
+  - ${{ if eq(parameters.DeploymentType, 'Kubernetes') }}:
+    - stage: Kubernetes
+      displayName: Kubernetes Image & Security Scan
+      jobs:
+        - job: Image
+          displayName: Build Image
+          pool: Customer-Projects
+          steps:
+            - task: Docker@2
+              displayName: Build Docker Image
+              inputs:
+                command: build
+                repository: $(imageRepository)
+                dockerfile: $(dockerfilePath)
+                containerRegistry: $(dockerRegistryServiceConnection)
+                tags: |
+                  $(tag)
+
+        - ${{ if eq(parameters.TrivyImageScan, true) }}:
+          - job: Scan
+            dependsOn: Image
+            displayName: Scan Image
+            pool: Customer-Projects
+            steps:
+              - checkout: none
+              - bash: /usr/local/bin/trivy image --severity HIGH,CRITICAL --exit-code 1  --ignore-unfixed $(containerRegistry)/$(imageRepository):$(tag)
+
+        - job: Upload
+          ${{ if eq(parameters.TrivyImageScan, true) }}:
+              dependsOn:
+                - Image
+                - Scan
+          ${{ if eq(parameters.TrivyImageScan, false) }}:
+              dependsOn:
+                - Image
+          pool: Customer-Projects
+          steps:
+            - checkout: none
+            - task: Docker@2
+              inputs:
+                containerRegistry: $(dockerRegistryServiceConnection)
+                repository: $(imageRepository)
+                command: push
+                tags: |
+                  $(tag)
+  - ${{ if eq(parameters.DeploymentType, 'PepsiCo') }}:
+      - stage: PepsiCo
+        displayName: Upload to Blob
+        jobs:    
+          - job: UploadtoBlob
+            displayName: Upload to Blob
+            pool: Customer-Projects
+            steps:
+              - checkout: envRepo
+                path: envs
+              - checkout: self
+                path: s             
+              - script: |
+                  echo "--- PEPSICO STAGE PATH INFO ---"
+                  echo "Sources Dir: $(Build.SourcesDirectory)"
+                displayName: 'Display Workspace Paths'
+              - task: Bash@3
+                displayName: "Upload to Blob"
+                inputs:
+                  targetType: 'inline'
+                  script: |
+                    cp "$(Pipeline.Workspace)/envs/$(ENV_FILE_NAME)" "$(Build.SourcesDirectory)/.env"
+                    date=$(date +%Y_%m_%d_%H_%M_%S)
+                    tar --exclude='.git' --exclude='.scannerwork' --exclude='sonar-project.properties' --exclude='PULSE_API_Code_$(Build.SourceBranchName)_*.tar.gz' -cvzf PULSE_API_Code_$(Build.SourceBranchName)_$date.tar.gz .
+                    az login --service-principal -u $(appid) -p $(secret) -t $(tenantid)
+                    az storage blob upload --account-name $(storagename) --container-name $(container) --name PULSE_API_Code_$(Build.SourceBranchName)_$date.tar.gz --file PULSE_API_Code_$(Build.SourceBranchName)_$date.tar.gz --auth-mode login
+                    end=`date -u -d "30 minutes" '+%Y-%m-%dT%H:%MZ'`
+                    az storage blob generate-sas --account-name $(storagename) --container-name $(container) --name PULSE_API_Code_$(Build.SourceBranchName)_$date.tar.gz --permissions acdrw --expiry $end --auth-mode login --as-user --full-uri
