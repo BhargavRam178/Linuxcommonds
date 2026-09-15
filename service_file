@@ -1,0 +1,88 @@
+apiVersion: v1
+kind: Service
+metadata:
+  name: v5-api-app-pulse
+  namespace: dev-vtx-api
+  uid: 91f2179f-5ebe-4845-b652-c7d48603970b
+  resourceVersion: '68431488'
+  creationTimestamp: '2026-04-02T20:43:37Z'
+  annotations:
+    azure-pipelines/jobName: '"Deploy to Kubernetes"'
+    azure-pipelines/org: https://dev.azure.com/everestdx/
+    azure-pipelines/pipeline: '"Dev-V5-API-AppPulse"'
+    azure-pipelines/pipelineId: '"270"'
+    azure-pipelines/project: EDXi_Platform_Roadmap
+    azure-pipelines/run: '20260803.1'
+    azure-pipelines/runuri: >-
+      https://dev.azure.com/everestdx/EDXi_Platform_Roadmap/_build/results?buildId=35200
+    kubectl.kubernetes.io/last-applied-configuration: >
+      {"apiVersion":"v1","kind":"Service","metadata":{"annotations":{},"name":"v5-api-app-pulse","namespace":"dev-vtx-api"},"spec":{"ports":[{"name":"api-port","nodePort":32758,"port":8000,"protocol":"TCP","targetPort":8000}],"selector":{"app":"v5-api-app-pulse"}}}
+  managedFields:
+    - manager: Mozilla
+      operation: Update
+      apiVersion: v1
+      time: '2026-04-02T20:43:37Z'
+      fieldsType: FieldsV1
+      fieldsV1:
+        f:spec:
+          f:externalTrafficPolicy: {}
+          f:internalTrafficPolicy: {}
+          f:ports:
+            .: {}
+            k:{"port":8000,"protocol":"TCP"}:
+              .: {}
+              f:name: {}
+              f:nodePort: {}
+              f:port: {}
+              f:protocol: {}
+              f:targetPort: {}
+          f:selector: {}
+          f:sessionAffinity: {}
+          f:type: {}
+    - manager: kubectl-client-side-apply
+      operation: Update
+      apiVersion: v1
+      time: '2026-05-04T22:16:05Z'
+      fieldsType: FieldsV1
+      fieldsV1:
+        f:metadata:
+          f:annotations:
+            .: {}
+            f:kubectl.kubernetes.io/last-applied-configuration: {}
+    - manager: kubectl-annotate
+      operation: Update
+      apiVersion: v1
+      time: '2026-08-03T13:48:40Z'
+      fieldsType: FieldsV1
+      fieldsV1:
+        f:metadata:
+          f:annotations:
+            f:azure-pipelines/jobName: {}
+            f:azure-pipelines/org: {}
+            f:azure-pipelines/pipeline: {}
+            f:azure-pipelines/pipelineId: {}
+            f:azure-pipelines/project: {}
+            f:azure-pipelines/run: {}
+            f:azure-pipelines/runuri: {}
+  selfLink: /api/v1/namespaces/dev-vtx-api/services/v5-api-app-pulse
+status:
+  loadBalancer: {}
+spec:
+  ports:
+    - name: api-port
+      protocol: TCP
+      port: 8000
+      targetPort: 8000
+      nodePort: 32758
+  selector:
+    app: v5-api-app-pulse
+  clusterIP: 10.0.8.83
+  clusterIPs:
+    - 10.0.8.83
+  type: NodePort
+  sessionAffinity: None
+  externalTrafficPolicy: Cluster
+  ipFamilies:
+    - IPv4
+  ipFamilyPolicy: SingleStack
+  internalTrafficPolicy: Cluster
