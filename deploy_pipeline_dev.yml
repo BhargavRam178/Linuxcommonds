@@ -1,0 +1,82 @@
+# Pipeline for PULSE API Deployment
+trigger: none
+
+parameters:
+  - name: InstallRequirements
+    displayName: Install Python Requirements
+    type: string
+    default: 'False'
+    values:
+        - 'True'
+        - 'False'
+
+pool: VantageX_Agent
+stages:
+  - stage: Build
+    displayName: Build stage
+    jobs:
+      - job: Build
+        displayName: Build job
+        pool: VantageX_Agent
+        steps:
+          - checkout: none
+          - bash: curl --output PULSE_API_Code.tar "$(bloburl)"
+          - task: CopyFiles@2
+            displayName: 'Copy Files to artifact staging directory'
+            inputs:
+              SourceFolder: '$(Build.Repository.LocalPath)'
+              Contents: PULSE_API_Code.tar
+              TargetFolder: $(Build.ArtifactStagingDirectory)
+              CleanTargetFolder: true
+          - publish: $(Build.ArtifactStagingDirectory)
+            artifact: API_Code
+  - stage: Deploy_to_VM
+    jobs:
+      - deployment: VMDeploy
+        displayName: API
+        environment:
+          name:  VantageX_Dev
+          resourceType: VirtualMachine
+          tags: api_uf_dev
+        workspace:
+          clean: all
+        strategy:
+          runOnce:
+              deploy:
+                steps:
+                - download: current
+                  artifact: API_Code
+                - task: Bash@3
+                  inputs:
+                    targetType: 'inline'
+                    script: |
+                      echo "Deployment Started"
+                      date=$(date +%Y_%m_%d_%H_%M_%S)
+                      [ -d /vantagex/pepvantagexappbackup/api_backup/api-pulse-pep/$date ] || mkdir -p /vantagex/pepvantagexappbackup/api_backup/api-pulse-pep/$date
+                      mv /vantagex/ausiytic/apps/api/api-pulse-pep/* /vantagex/pepvantagexappbackup/api_backup/api-pulse-pep/$date/
+                      tar xzf $(Pipeline.Workspace)/API_Code/PULSE_API_Code.tar -C /vantagex/ausiytic/apps/api/api-pulse-pep
+                      [ -d /vantagex/ausiytic/apps/api/api-pulse-pep/app/logs ] || mkdir -p /vantagex/ausiytic/apps/api/api-pulse-pep/app/logs
+
+                - ${{ if eq(parameters.InstallRequirements, 'True') }}:
+                    - task: Bash@3
+                      displayName: 'Install Requirements'
+                      inputs:
+                        targetType: 'inline'
+                        script: |
+                          echo "Installing Python requirements"
+                          cd /vantagex/ausiytic/apps/python3.13/v5-apis/api-pulse-pep
+                          source bin/activate
+                          pip install -r /vantagex/ausiytic/apps/api/api-pulse-pep/requirement.txt
+                          deactivate
+                          echo "Requirements installation completed"
+ 
+                - task: Bash@3
+                  displayName: 'Restart Service'
+                  inputs:
+                    targetType: 'inline'
+                    script: |
+                      echo "Restarting service"
+                      sudo systemctl stop api-pulse-pep 
+                      sudo systemctl start api-pulse-pep
+                      echo "Service restarted"
+                      echo "Deployment Completed"
